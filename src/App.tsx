@@ -1,26 +1,58 @@
-import React from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import logo from './logo.svg';
 import './App.css';
+import ArRTC from "ar-rtc-sdk";
+import Video from "./Video";
+import video from "./Video";
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+    const [selectedChannel, setSelectedChannel] = useState<string>()
+    const [channelList, setChannelList] = useState<string[]>([])
+    const primaryChannel = useMemo(() => {
+        let channel = channelList.find(it => it === selectedChannel);
+        if (channel) {
+            return channel
+        } else {
+            return channelList[0]
+        }
+    }, [channelList, selectedChannel])
+    const playList = channelList
+    const [channel, setChannel] = useState("")
+    return (
+        <>
+            <div style={{height: "100vh", width: "100vw", display: "flex", flexDirection: "column"}}>
+                <label htmlFor={"channel"}>
+                    <span>Channel:</span>
+                    <input value={channel} onChange={event => setChannel(event.target.value)} id={"channel"}
+                           onKeyDown={event => {
+                               if (event.key === "Enter") {
+                                   setChannelList(channelList.concat([channel]))
+                               }
+                           }}/>
+                </label>
+                <div style={{
+                    height: "80%",
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "row",
+                    justifyContent: "space-between"
+                }}>
+                    <div style={{height: "100%", width: "80%"}}>
+                        {primaryChannel ? <Video channel={primaryChannel} key={primaryChannel}/> : null}
+                    </div>
+                    <div style={{height: "100%", width: "20%", display: "flex", flexDirection: "column"}}>
+                        {playList.map(item => {
+                            return (
+                                <div style={{height: "25%", width: "100%", border: "1px solid green"}} key={item}><Video
+                                    channel={item} onClick={() => setSelectedChannel(item)}
+                                    onClose={() => setChannelList(channelList.splice(channelList.indexOf(item), 1))}/>
+                                </div>)
+                        })}
+                    </div>
+                </div>
+            </div>
+        </>
+    );
 }
 
 export default App;
