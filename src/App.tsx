@@ -44,6 +44,7 @@ function App() {
                         {playList.map(item => {
                             return (
                                 <div style={{height: "25%", width: "100%", border: "1px solid green"}} key={item}><Video
+                                    lowStream
                                     channel={item} onClick={() => setSelectedChannel(item)}
                                     onClose={() => setChannelList(channelList.splice(channelList.indexOf(item), 1))}/>
                                 </div>)
