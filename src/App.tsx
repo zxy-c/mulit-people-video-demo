@@ -4,6 +4,7 @@ import './App.css';
 import ArRTC from "ar-rtc-sdk";
 import Video from "./Video";
 import video from "./Video";
+import ArrayUtils from "./ArrayUtils";
 
 function App() {
     const [selectedChannel, setSelectedChannel] = useState<string>()
@@ -20,6 +21,8 @@ function App() {
     const [channel, setChannel] = useState("")
     return (
         <>
+            {channelList}
+            {playList}
             <div style={{height: "100vh", width: "100vw", display: "flex", flexDirection: "column"}}>
                 <label htmlFor={"channel"}>
                     <span>Channel:</span>
@@ -46,7 +49,11 @@ function App() {
                                 <div style={{height: "25%", width: "100%", border: "1px solid green"}} key={item}><Video
                                     lowStream
                                     channel={item} onClick={() => setSelectedChannel(item)}
-                                    onClose={() => setChannelList(channelList.splice(channelList.indexOf(item), 1))}/>
+                                    onClose={() => {
+                                        let arr = Array.from(channelList);
+                                        ArrayUtils.remove(arr,item)
+                                        setChannelList(arr);
+                                    }}/>
                                 </div>)
                         })}
                     </div>

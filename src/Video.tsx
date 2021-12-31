@@ -30,6 +30,7 @@ const Video: React.FC<SmallVideoProps> = ({onClick, channel,onClose,lowStream=fa
                 })
             })
             arRTCClient.on("user-unpublished", (user, mediaType) => {
+                console.log("unpublish",user,mediaType,onClose)
                 if (mediaType==="video"){
                     onClose&&onClose()
                 }
