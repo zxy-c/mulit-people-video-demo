@@ -12,7 +12,7 @@ const Video: React.FC<SmallVideoProps> = ({onClick, channel,onClose,lowStream=fa
     const ref = useRef<HTMLDivElement>()
     useEffect(() => {
         const arRTCClient = ArRTC.createClient({mode: "live", codec: "h264", role: "audience"});
-        arRTCClient.join("ebf62644e451744fc0dbf1a1682b8120",channel,null,null).then(()=>{
+        arRTCClient.join("540a416d66908f6799b9d1da3c8b4162",channel,null,null).then(()=>{
             arRTCClient.on("user-published", async (user, mediaType) => {
                 try {
                     await arRTCClient.setRemoteVideoStreamType(user.uid, lowStream ? 1 : 0)
