@@ -8,28 +8,39 @@ import ArrayUtils from "./ArrayUtils";
 
 function App() {
     const [selectedChannel, setSelectedChannel] = useState<string>()
-    const [channelList, setChannelList] = useState<string[]>([])
+    const [channelList, setChannelList] = useState<Map<string,string>>(new Map())
     const primaryChannel = useMemo(() => {
-        let channel = channelList.find(it => it === selectedChannel);
+        let strings = Array.from(channelList.keys());
+        let channel = strings.find(it => it === selectedChannel);
         if (channel) {
             return channel
         } else {
-            return channelList[0]
+            return strings[0]
         }
     }, [channelList, selectedChannel])
     const playList = channelList
     const [channel, setChannel] = useState("")
+    const [token,setToken]=useState("")
     return (
         <>
-            {channelList}
-            {playList}
+
             <div style={{height: "100vh", width: "100vw", display: "flex", flexDirection: "column"}}>
+                {channelList.entries()}
                 <label htmlFor={"channel"}>
                     <span>Channel:</span>
                     <input value={channel} onChange={event => setChannel(event.target.value)} id={"channel"}
                            onKeyDown={event => {
                                if (event.key === "Enter") {
-                                   setChannelList(channelList.concat([channel]))
+                                   setChannelList(new Map(channelList).set(channel,token))
+                               }
+                           }}/>
+                </label>
+                <label htmlFor={"token"}>
+                    <span>Token:</span>
+                    <input value={token} onChange={event => setToken(event.target.value)} id={"token"}
+                           onKeyDown={event => {
+                               if (event.key === "Enter") {
+                                   setChannelList(new Map(channelList).set(channel,token))
                                }
                            }}/>
                 </label>
@@ -41,18 +52,20 @@ function App() {
                     justifyContent: "space-between"
                 }}>
                     <div style={{height: "100%", width: "80%"}}>
-                        {primaryChannel ? <Video channel={primaryChannel} key={primaryChannel}/> : null}
+                        {primaryChannel ? <Video channel={primaryChannel} token={channelList.get(primaryChannel)!!} key={primaryChannel}/> : null}
                     </div>
                     <div style={{height: "100%", width: "20%", display: "flex", flexDirection: "column"}}>
-                        {playList.map(item => {
+                        {Array.from(playList.entries()).map(item => {
+
                             return (
-                                <div style={{height: "25%", width: "100%", border: "1px solid green"}} key={item}><Video
+                                <div style={{height: "25%", width: "100%", border: "1px solid green"}} key={item[0]}><Video
                                     lowStream
-                                    channel={item} onClick={() => setSelectedChannel(item)}
+                                    channel={item[0]} onClick={() => setSelectedChannel(item[0])}
+                                    token={item[1]}
                                     onClose={() => {
-                                        let arr = Array.from(channelList);
-                                        ArrayUtils.remove(arr,item)
-                                        setChannelList(arr);
+                                        let newMap = new Map(channelList.entries());
+                                        newMap.delete(item[0])
+                                        setChannelList(newMap)
                                     }}/>
                                 </div>)
                         })}
