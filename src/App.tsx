@@ -175,7 +175,6 @@ function App() {
                                        let file = (event.target.files || [])[0];
                                        let fileReader = new FileReader();
                                        fileReader.onload = () => {
-                                           console.log("onload")
                                            let result = fileReader.result as string;
                                            let image = new Image();
                                            image.onload = ev => {
