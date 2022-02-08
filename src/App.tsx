@@ -1,9 +1,10 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import './App.css';
 import Video from "./Video";
-import AgoraRTC, {IAgoraRTCRemoteUser, ICameraVideoTrack} from "agora-rtc-sdk-ng";
-import {APP_ID} from "./Settings";
+import AgoraRTC, {IAgoraRTCRemoteUser, ICameraVideoTrack, LiveStreamingTranscodingConfig} from "agora-rtc-sdk-ng";
+import {APP_ID, TEMP_TOKEN} from "./Settings";
 import AgoraRTM from "agora-rtm-sdk"
+import {LiveTranscoding} from "agora-rtc-sdk";
 
 interface Message {
     memberId: string
@@ -53,12 +54,69 @@ function App() {
     }
 
     function joinChannel() {
-        agoraRTC.join(APP_ID, channel, null,).then(async () => {
+        const id = Math.floor(Math.random() * 9999)
+        agoraRTC.join(APP_ID, channel, TEMP_TOKEN,id).then(async () => {
             setCurrentChannel(channel)
             const [microphoneTrack, cameraTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
             setPrimaryVideo(cameraTrack)
             await agoraRTC.publish([cameraTrack, microphoneTrack])
-            await agoraRTM.login({uid: account})
+
+            function getLiveTranscoding() {
+                // CDN 推流参数设置。
+                const allUserIds = [id, ...agoraRTC.remoteUsers.map(it => it.uid)]
+                const width = 360;
+                const height = 640;
+                const heightPerUser = height / allUserIds.length;
+                const liveTranscoding: LiveStreamingTranscodingConfig = {
+                    audioChannels: 2,
+                    // 用于旁路推流的输出视频流的总宽度 (px)。640 为默认值。
+                    width,
+                    // 用于旁路推流的输出视频流的总高度 (px)。360 为默认值。
+                    height,
+                    // 设置推流输出视频的码率 (Kbps)，默认值为 400。
+                    videoBitrate: 400,
+                    // 用于旁路推流的输出视频的帧率 (fps)。默认值为 15。
+                    audioSampleRate: 48000,
+                    audioBitrate: 48,
+                    videoGop: 30,
+                    userConfigExtraInfo: "",
+                    backgroundColor: 0xFFFFFF,
+                    transcodingUsers: allUserIds.map((item, index) => {
+                        return {
+                            uid: item,
+                            height: heightPerUser,
+                            width: width,
+                            zOrder: 0,
+                            x: 0,
+                            y: heightPerUser * index,
+                            alpha: 1.0
+                        }
+                    })
+                }
+                console.log("live transcoding: ", liveTranscoding)
+                return liveTranscoding
+            }
+
+
+            try {
+
+                agoraRTC.on("live-streaming-error", event => {
+                    console.error(event)
+                })
+                agoraRTC.on("live-streaming-warning", event => {
+                    console.error(event)
+                })
+                // await agoraRTC.setLiveTranscoding(getLiveTranscoding())
+                // await agoraRTC.startLiveStreaming("rtmp://watch.lacak.io:1935/static/livevoc", true)
+            } finally {
+            }
+            console.error("before fetch")
+            let response = await fetch(`http://rtcback.zhiyashengya.com/agora/tempTokens?uid=${account}`,{
+                method:"GET",
+                mode:"cors"
+            });
+            let rtmToken = await response.text();
+            await agoraRTM.login({uid: account, token: rtmToken})
             let rtmChannel = agoraRTM.createChannel(channel);
             setRtmChannel(rtmChannel)
             await rtmChannel.join()
@@ -84,7 +142,7 @@ function App() {
                 } catch (e) {
                     console.error(e)
                 }
-
+                console.log("user published", user)
                 agoraRTC.subscribe(user, mediaType).then(() => {
                     if (mediaType === "video" && user.videoTrack) {
                         const array = Array.from(users)
@@ -95,12 +153,14 @@ function App() {
                         user.audioTrack?.play()
                     }
                 })
+                await agoraRTC.setLiveTranscoding(getLiveTranscoding())
             })
-            agoraRTC.on("user-unpublished", (user, mediaType) => {
+            agoraRTC.on("user-unpublished", async (user, mediaType) => {
                 console.log("unpublish", user, mediaType)
                 const array = Array.from(users)
                 users.splice(array.findIndex(it => it.uid === user.uid), 1)
                 setUsers(array)
+                await agoraRTC.setLiveTranscoding(getLiveTranscoding())
             })
         })
     }
@@ -151,9 +211,9 @@ function App() {
                 {rtmChannel ? <div style={{display: "flex", height: "calc(20vh - 36px)"}}>
                     <div style={{overflowY: "auto", flex: 1}} ref={ref => messageContainerRef.current = ref}>
                         {messages.map((log, index) => {
-                            if (log.image){
-                                return <div> {log.memberId}: <img src={log.image} key={index}/></div>
-                            }else {
+                            if (log.image) {
+                                return <div key={index}> {log.memberId}: <img src={log.image}/></div>
+                            } else {
                                 return <p key={index}>{log.memberId}: {log.text}</p>
                             }
                         })}
@@ -169,7 +229,7 @@ function App() {
                         }}>Send
                         </button>
                         <label htmlFor={"sendFileInput"}>
-                                Send File
+                            Send File
                             <input type={"file"} id={"sendFileInput"} style={{width: 0, height: 0}}
                                    onChange={(event) => {
                                        let file = (event.target.files || [])[0];
@@ -191,17 +251,17 @@ function App() {
                                                    let imageMessage = agoraRTM.createMessage({
                                                        messageType: "IMAGE",
                                                        mediaId: mediaMessage.mediaId,
-                                                       fileName:"example.jpg",
-                                                       description:"send image",
-                                                       thumbnail:file,
+                                                       fileName: "example.jpg",
+                                                       description: "send image",
+                                                       thumbnail: file,
                                                        width: image.width,
                                                        height: image.height,
                                                        thumbnailWidth: 50,
                                                        thumbnailHeight: 50
                                                    });
-                                                       rtmChannel.sendMessage(imageMessage).then(()=>{
-                                                           pushMessage({memberId:account,image:result})
-                                                       })
+                                                   rtmChannel.sendMessage(imageMessage).then(() => {
+                                                       pushMessage({memberId: account, image: result})
+                                                   })
                                                })
                                            }
                                            image.src = result
