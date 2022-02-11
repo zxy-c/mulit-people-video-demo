@@ -2,9 +2,8 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import './App.css';
 import Video from "./Video";
 import AgoraRTC, {IAgoraRTCRemoteUser, ICameraVideoTrack, LiveStreamingTranscodingConfig} from "agora-rtc-sdk-ng";
-import {APP_ID, TEMP_TOKEN} from "./Settings";
+import {APP_ID} from "./Settings";
 import AgoraRTM from "agora-rtm-sdk"
-import {LiveTranscoding} from "agora-rtc-sdk";
 
 interface Message {
     memberId: string
@@ -53,9 +52,14 @@ function App() {
         messageContainerRef.current?.scrollTo({top: messageContainerRef.current!!.scrollHeight})
     }
 
-    function joinChannel() {
+    async function joinChannel() {
         const id = Math.floor(Math.random() * 9999)
-        agoraRTC.join(APP_ID, channel, TEMP_TOKEN,id).then(async () => {
+        let rtcTokenResponse = await fetch(`http://rtcback.zhiyashengya.com/agora/tempTokens/rtc?channelName=${channel}`, {
+            method: "GET",
+            mode: "cors"
+        });
+        let rtcToken = await rtcTokenResponse.text();
+        agoraRTC.join(APP_ID, channel, rtcToken, id).then(async () => {
             setCurrentChannel(channel)
             const [microphoneTrack, cameraTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
             setPrimaryVideo(cameraTrack)
@@ -98,6 +102,7 @@ function App() {
             }
 
 
+
             try {
 
                 agoraRTC.on("live-streaming-error", event => {
@@ -110,22 +115,26 @@ function App() {
                 // await agoraRTC.startLiveStreaming("rtmp://watch.lacak.io:1935/static/livevoc", true)
             } finally {
             }
-            console.error("before fetch")
-            let response = await fetch(`http://rtcback.zhiyashengya.com/agora/tempTokens?uid=${account}`,{
-                method:"GET",
-                mode:"cors"
+            let response = await fetch(`http://rtcback.zhiyashengya.com/agora/tempTokens?uid=${account}`, {
+                method: "GET",
+                mode: "cors"
             });
             let rtmToken = await response.text();
             await agoraRTM.login({uid: account, token: rtmToken})
             let rtmChannel = agoraRTM.createChannel(channel);
             setRtmChannel(rtmChannel)
             await rtmChannel.join()
+            // setUsers(agoraRTC.remoteUsers.filter(u=>{
+            //     return u.hasVideo
+            // }))
             agoraRTC.remoteUsers.forEach(u => {
                 if (u.hasVideo) {
                     agoraRTC.subscribe(u, "video").then(track => {
-                        const array = Array.from(users)
-                        array.push(u)
-                        setUsers(array)
+                        setUsers(prevState => {
+                            const array = Array.from(prevState)
+                            array.push(u)
+                            return array
+                        })
                     })
                 }
                 if (u.hasAudio) {
@@ -142,12 +151,13 @@ function App() {
                 } catch (e) {
                     console.error(e)
                 }
-                console.log("user published", user)
                 agoraRTC.subscribe(user, mediaType).then(() => {
                     if (mediaType === "video" && user.videoTrack) {
-                        const array = Array.from(users)
-                        array.push(user)
-                        setUsers(array)
+                        setUsers(prevState => {
+                            const array = Array.from(prevState)
+                            array.push(user)
+                            return array;
+                        })
                     }
                     if (mediaType === "audio") {
                         user.audioTrack?.play()
@@ -156,10 +166,16 @@ function App() {
                 await agoraRTC.setLiveTranscoding(getLiveTranscoding())
             })
             agoraRTC.on("user-unpublished", async (user, mediaType) => {
-                console.log("unpublish", user, mediaType)
-                const array = Array.from(users)
-                users.splice(array.findIndex(it => it.uid === user.uid), 1)
-                setUsers(array)
+
+                if (mediaType==="video"){
+                    setUsers(prevState => {
+                        const array = Array.from(prevState)
+                        let index = array.findIndex(it => it.uid === user.uid);
+                        if (index !== -1)
+                            array.splice(index, 1)
+                        return array
+                    })
+                }
                 await agoraRTC.setLiveTranscoding(getLiveTranscoding())
             })
         })
@@ -169,6 +185,7 @@ function App() {
         <>
 
             <div style={{height: "100vh", width: "100vw", display: "flex", flexDirection: "column"}}>
+                {users.map(it=>it.uid).join(",")}
                 {currentChannel ?
                     <div style={{height: 36}}>{`Current Channel:${currentChannel} Your Account:${account}`}</div> : <>
                         <><label htmlFor={"channel"}>

@@ -6,13 +6,13 @@ export interface SmallVideoProps {
     onClick?: () => void
     onClose?: () => void
     lowStream?: boolean
-    video:ITrack
+    video?:ITrack
 }
 
 const Video: React.FC<SmallVideoProps> = ({onClick,  onClose, lowStream = false,video}) => {
     const ref = useRef<HTMLDivElement>()
     useEffect(() => {
-        video.play(ref.current!!)
+        video?.play(ref.current!!)
     }, [video])
 
     return (<>
